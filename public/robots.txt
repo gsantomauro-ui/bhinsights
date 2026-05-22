@@ -1,0 +1,29 @@
+User-agent: *
+Allow: /
+
+# GEO: Explicitly allow AI and Generative engines to crawl content for knowledge base
+User-agent: Google-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: Omgili
+Allow: /
+
+Sitemap: https://bhinsights.es/sitemap.xml

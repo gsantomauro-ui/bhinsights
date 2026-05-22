@@ -1,0 +1,77 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidArticle(data) {
+      return data.keys().hasAll(['slug', 'title', 'excerpt', 'categoryId', 'categoryName', 'categorySlug', 'authorName', 'authorRole', 'date', 'imageUrl', 'readTime', 'createdAt', 'updatedAt'])
+        && data.keys().size() >= 13
+        && data.slug is string && data.slug.size() <= 200
+        && data.title is string && data.title.size() <= 200
+        && data.excerpt is string && data.excerpt.size() <= 500
+        && data.categoryId is string && data.categoryId.size() <= 100
+        && data.categoryName is string && data.categoryName.size() <= 100
+        && data.categorySlug is string && data.categorySlug.size() <= 100
+        && data.authorName is string && data.authorName.size() <= 100
+        && data.authorRole is string && data.authorRole.size() <= 100
+        && data.date is string && data.date.size() <= 100
+        && data.imageUrl is string && data.imageUrl.size() <= 500
+        && data.readTime is string && data.readTime.size() <= 50
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && (data.get('content', '') is string)
+        && (data.get('featured', false) is bool)
+        && (data.get('isBreaking', false) is bool)
+        && (data.get('type', '') is string)
+        && (data.get('published', true) is bool);
+    }
+    
+    match /articles/{articleId} {
+      allow read: if true; // Publicly readable articles
+      allow create: if isAdmin() && isValidId(articleId) && isValidArticle(incoming()) && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isAdmin() && isValidId(articleId) && isValidArticle(incoming()) && incoming().updatedAt == request.time && incoming().createdAt == existing().createdAt;
+      allow delete: if isAdmin() && isValidId(articleId);
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'role', 'createdAt'])
+        && data.keys().size() == 3
+        && data.email is string && data.email.size() <= 200
+        && data.role is string && (data.role == 'admin' || data.role == 'author')
+        && data.createdAt is timestamp;
+    }
+
+    match /users/{userId} {
+      // Users can only be read by themselves or admins
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // Only an admin can create/update users. 
+      // Bootstrap: Allow creating the first admin if the users collection is empty? No, we will seed it manually or via a trusted server.
+      allow create: if false; 
+      allow update: if isAdmin() && isValidId(userId) && isValidUser(incoming()) && incoming().createdAt == existing().createdAt;
+      allow delete: if false;
+    }
+  }
+}
